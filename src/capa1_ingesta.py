@@ -66,6 +66,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Falla si falta algún capítulo esperado cap1..cap7.",
     )
+    parser.add_argument(
+        "--exclude-file",
+        action="append",
+        default=[],
+        help="Nombre de archivo a excluir de la ingesta. Puede repetirse.",
+    )
     return parser.parse_args()
 
 
@@ -91,8 +97,13 @@ def classify_filename(stem: str) -> tuple[str | None, str | None, str]:
     return chapter, version, "OK"
 
 
-def collect_input_files(source_dir: Path) -> list[Path]:
-    files = [p for p in source_dir.iterdir() if p.is_file() and p.suffix.lower() in ALLOWED_EXTENSIONS]
+def collect_input_files(source_dir: Path, excluded_names: set[str] | None = None) -> list[Path]:
+    normalized_exclusions = {n.lower() for n in (excluded_names or set())}
+    files = [
+        p
+        for p in source_dir.iterdir()
+        if p.is_file() and p.suffix.lower() in ALLOWED_EXTENSIONS and p.name.lower() not in normalized_exclusions
+    ]
     return sorted(files)
 
 
@@ -194,7 +205,7 @@ def main() -> int:
         print(f"ERROR: ruta de entrada inválida: {source_dir}")
         return 2
 
-    source_files = collect_input_files(source_dir)
+    source_files = collect_input_files(source_dir, set(args.exclude_file))
     if not source_files:
         print(f"ERROR: no se encontraron archivos {sorted(ALLOWED_EXTENSIONS)} en {source_dir}")
         return 2

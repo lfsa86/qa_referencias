@@ -52,7 +52,7 @@ def parse_args() -> argparse.Namespace:
         "--cap7-file",
         type=Path,
         default=None,
-        help="Ruta markdown/txt para Capa 4. Por defecto: salida de Capa 2 en markdown/cap7.md",
+        help="Ruta de capítulo 7 para Capa 4 (.md/.txt/.docx). Si se indica, se excluye de Capa 1.",
     )
     parser.add_argument("--umbral-similitud", type=float, default=0.75, help="Umbral de similitud para Capa 5")
     parser.add_argument(
@@ -120,6 +120,8 @@ def main() -> int:
     ]
     if args.strict:
         capa1_cmd.append("--strict")
+    if args.cap7_file is not None:
+        capa1_cmd.extend(["--exclude-file", args.cap7_file.name])
 
     capa2_cmd = [
         py,

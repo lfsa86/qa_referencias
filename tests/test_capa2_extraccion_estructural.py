@@ -14,8 +14,9 @@ class TestCapa2Extraccion(unittest.TestCase):
 
     def test_detect_referenciables(self):
         page = (
-            "Como se observa en Tabla 2-14, el impacto es moderado. "
-            "Ver Figura 3.2 y Numeral 4.1.3 para mayor detalle."
+            "Tabla 2-14 ........ 45\n"
+            "Figura 3.2 ....... 46\n"
+            "Numeral 4.1.3 .... 47"
         )
         refs = detect_referenciables(page, 10, "cap7.pdf")
         tipos = sorted([r.tipo for r in refs])
@@ -32,6 +33,11 @@ class TestCapa2Extraccion(unittest.TestCase):
         self.assertIn("## Página 1", md)
         self.assertIn("### 1.1 Introducción", md)
         self.assertIn("_Página sin texto extraíble._", md)
+
+    def test_detect_referenciables_solo_tabla_contenido(self):
+        page = "Texto narrativo con Tabla 2-14 y Figura 3.2, sin puntos guía ni paginación"
+        refs = detect_referenciables(page, 1, "cap7.pdf")
+        self.assertEqual(refs, [])
 
 
 if __name__ == "__main__":

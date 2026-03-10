@@ -3,7 +3,7 @@
 
 Submódulos incluidos:
 - 2.1 Extracción de texto y bloques (texto por página).
-- 2.2 Detección de elementos referenciables (tabla/figura/numeral).
+- 2.2 Detección de elementos referenciables desde la tabla de contenido.
 
 Requiere `pypdf` para leer PDFs.
 """
@@ -24,6 +24,11 @@ TABLA_REGEX = re.compile(r"\b(Tabla\s+\d+[.-]\d+)\b", re.IGNORECASE)
 FIGURA_REGEX = re.compile(r"\b(Figura\s+\d+[.-]\d+)\b", re.IGNORECASE)
 NUMERAL_REGEX = re.compile(r"\b((?:Numeral\s+\d+(?:\.\d+)+)|(?:\d+\.\d+\.\d+))\b", re.IGNORECASE)
 HEADING_REGEX = re.compile(r"^\s*(\d+(?:\.\d+)+)\s+(.+)$")
+TOC_LINE_REGEX = re.compile(
+    r"^\s*(?P<entry>(?:Tabla|Figura)\s+\d+[.-]\d+|(?:Numeral\s+)?\d+(?:\.\d+)+)\s*"
+    r"(?:\.{2,}|\s{2,})\s*(?P<page>\d+)\s*$",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -83,24 +88,32 @@ def pages_to_markdown(pages: Iterable[str], source_name: str) -> str:
 
 def detect_referenciables(page_text: str, page_number: int, source_name: str) -> list[Referenciable]:
     results: list[Referenciable] = []
+    toc_lines = [line for line in page_text.split("\n") if TOC_LINE_REGEX.match(line)]
 
-    def add_matches(pattern: re.Pattern[str], tipo: str) -> None:
-        for match in pattern.finditer(page_text):
-            snippet = page_text[max(0, match.start() - 80) : min(len(page_text), match.end() + 80)]
-            results.append(
-                Referenciable(
-                    archivo=source_name,
-                    pagina=page_number,
-                    tipo=tipo,
-                    id_detectado=match.group(1),
-                    titulo_o_contexto=context_from_snippet(snippet),
-                    snippet=snippet.replace("\n", " ").strip(),
+    if not toc_lines:
+        return results
+
+    for toc_line in toc_lines:
+        entry = TOC_LINE_REGEX.match(toc_line).group("entry")  # type: ignore[union-attr]
+
+        def add_matches(pattern: re.Pattern[str], tipo: str) -> None:
+            for match in pattern.finditer(entry):
+                snippet = toc_line.strip()
+                results.append(
+                    Referenciable(
+                        archivo=source_name,
+                        pagina=page_number,
+                        tipo=tipo,
+                        id_detectado=match.group(1),
+                        titulo_o_contexto=context_from_snippet(snippet),
+                        snippet=snippet,
+                    )
                 )
-            )
 
-    add_matches(TABLA_REGEX, "tabla")
-    add_matches(FIGURA_REGEX, "figura")
-    add_matches(NUMERAL_REGEX, "numeral")
+        add_matches(TABLA_REGEX, "tabla")
+        add_matches(FIGURA_REGEX, "figura")
+        add_matches(NUMERAL_REGEX, "numeral")
+
     return results
 
 

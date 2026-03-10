@@ -13,6 +13,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+CSV_ENCODING = "utf-8-sig"
+
 TABLA_REGEX = re.compile(r"\b(Tabla\s+([1-7])[.-](\d+))\b", re.IGNORECASE)
 FIGURA_REGEX = re.compile(r"\b(Figura\s+([1-7])[.-](\d+))\b", re.IGNORECASE)
 NUMERAL_FULL_REGEX = re.compile(r"\b(Numeral\s+([1-7])((?:\.\d+)+))\b", re.IGNORECASE)
@@ -170,7 +172,7 @@ def extract_references(md_or_txt: str, source_name: str) -> list[RefCap7]:
 
 def write_csv(path: Path, refs: list[RefCap7]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as f:
+    with path.open("w", encoding=CSV_ENCODING, newline="") as f:
         w = csv.writer(f)
         w.writerow(
             [

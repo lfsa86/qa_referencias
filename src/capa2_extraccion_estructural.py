@@ -18,6 +18,8 @@ from pathlib import Path
 from typing import Iterable
 
 
+CSV_ENCODING = "utf-8-sig"
+
 TABLA_REGEX = re.compile(r"\b(Tabla\s+\d+[.-]\d+)\b", re.IGNORECASE)
 FIGURA_REGEX = re.compile(r"\b(Figura\s+\d+[.-]\d+)\b", re.IGNORECASE)
 NUMERAL_REGEX = re.compile(r"\b((?:Numeral\s+\d+(?:\.\d+)+)|(?:\d+\.\d+\.\d+))\b", re.IGNORECASE)
@@ -116,7 +118,7 @@ def write_markdown(md_path: Path, content: str) -> None:
 
 def write_elements_csv(csv_path: Path, rows: list[Referenciable]) -> None:
     csv_path.parent.mkdir(parents=True, exist_ok=True)
-    with csv_path.open("w", newline="", encoding="utf-8") as f:
+    with csv_path.open("w", newline="", encoding=CSV_ENCODING) as f:
         writer = csv.writer(f)
         writer.writerow(["archivo", "pagina", "tipo", "id_detectado", "titulo_o_contexto", "snippet"])
         for r in rows:

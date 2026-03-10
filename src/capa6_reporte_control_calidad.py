@@ -15,6 +15,9 @@ from datetime import datetime
 from pathlib import Path
 
 
+CSV_ENCODING = "utf-8-sig"
+
+
 @dataclass
 class ValidationResult:
     archivo_cap7: str
@@ -74,7 +77,7 @@ def load_validacion(path: Path) -> list[ValidationResult]:
         raise FileNotFoundError(f"CSV de validación no encontrado: {path}")
 
     out: list[ValidationResult] = []
-    with path.open("r", encoding="utf-8", newline="") as f:
+    with path.open("r", encoding=CSV_ENCODING, newline="") as f:
         r = csv.DictReader(f)
         for row in r:
             out.append(
@@ -103,7 +106,7 @@ def load_manifest_rows(path: Path | None) -> list[dict[str, str]]:
     if not path.exists() or not path.is_file():
         return []
 
-    with path.open("r", encoding="utf-8", newline="") as f:
+    with path.open("r", encoding=CSV_ENCODING, newline="") as f:
         return list(csv.DictReader(f))
 
 

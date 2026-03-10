@@ -25,6 +25,7 @@ DEFAULT_SOURCE_PATH = ""
 EXPECTED_CHAPTERS = tuple(f"cap{i}" for i in range(1, 8))
 ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx"}
 CHAPTER_PATTERN = re.compile(r"^(cap[1-7])(?:_v(\d+))?$", re.IGNORECASE)
+CSV_ENCODING = "utf-8-sig"
 
 
 @dataclass
@@ -144,7 +145,7 @@ def strict_validation(records: Iterable[FileRecord]) -> list[str]:
 
 def write_manifest(out_lote_dir: Path, lote: str, records: list[FileRecord]) -> Path:
     manifest_path = out_lote_dir / "ingesta_manifest.csv"
-    with manifest_path.open("w", encoding="utf-8", newline="") as f:
+    with manifest_path.open("w", encoding=CSV_ENCODING, newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
             [

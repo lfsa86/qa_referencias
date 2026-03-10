@@ -242,3 +242,17 @@ python src/capa6_reporte_control_calidad.py --validacion-csv out/validacion_resu
 
 **Nota técnica**
 - Requiere `openpyxl` para escribir `.xlsx`.
+
+## Ejecución unificada del pipeline (capas 1 a 6)
+Se agregó el script `src/orquestador_pipeline.py` para correr todas las capas en secuencia.
+
+**Ejemplo de uso**
+```bash
+python src/orquestador_pipeline.py --source /ruta/a/insumos --workspace . --lote 20260310_120000 --version v1 --strict
+```
+
+**Parámetros útiles**
+- `--capa2-output-dir`: personaliza salida de la capa 2.
+- `--cap7-file`: usa un archivo de capítulo 7 específico para capa 4.
+- `--umbral-similitud`: ajusta umbral de matching en capa 5.
+- `--include-cap7-index`: incluye cap7 en índice maestro (capa 3).

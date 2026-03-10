@@ -166,7 +166,7 @@ python src/capa2_extraccion_estructural.py --input-dir input/lote_20260309_10000
 
 **Notas técnicas**
 - El módulo 2.1 usa `pypdf` para extraer texto por página.
-- El módulo 2.2 detecta `Tabla`, `Figura` y `Numeral` con regex.
+- El módulo 2.2 detecta `Tabla`, `Figura` y `Numeral` únicamente en líneas de tabla de contenido (entrada + número de página).
 
 
 ## Implementación inicial disponible (Capa 3)

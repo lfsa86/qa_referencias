@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+CSV_ENCODING = "utf-8-sig"
+
 TYPE_MAP = {
     "tabla": "tabla",
     "figura": "figura",
@@ -102,7 +104,7 @@ def hash_text(value: str) -> str:
 
 def load_element_rows(csv_path: Path, version: str) -> list[IndexRow]:
     rows: list[IndexRow] = []
-    with csv_path.open("r", encoding="utf-8", newline="") as f:
+    with csv_path.open("r", encoding=CSV_ENCODING, newline="") as f:
         reader = csv.DictReader(f)
         for raw in reader:
             tipo = normalize_type(raw.get("tipo", ""))
@@ -144,7 +146,7 @@ def deduplicate(rows: Iterable[IndexRow]) -> list[IndexRow]:
 
 def write_index_csv(output_csv: Path, rows: list[IndexRow]) -> None:
     output_csv.parent.mkdir(parents=True, exist_ok=True)
-    with output_csv.open("w", encoding="utf-8", newline="") as f:
+    with output_csv.open("w", encoding=CSV_ENCODING, newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
             [

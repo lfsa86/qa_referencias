@@ -14,6 +14,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+CSV_ENCODING = "utf-8-sig"
+
+
 @dataclass
 class IndexEntry:
     capitulo: str
@@ -92,7 +95,7 @@ def load_index(path: Path) -> list[IndexEntry]:
         raise FileNotFoundError(f"Índice no encontrado: {path}")
 
     rows: list[IndexEntry] = []
-    with path.open("r", encoding="utf-8", newline="") as f:
+    with path.open("r", encoding=CSV_ENCODING, newline="") as f:
         reader = csv.DictReader(f)
         for r in reader:
             rows.append(
@@ -116,7 +119,7 @@ def load_refs(path: Path) -> list[RefEntry]:
         raise FileNotFoundError(f"Referencias no encontradas: {path}")
 
     rows: list[RefEntry] = []
-    with path.open("r", encoding="utf-8", newline="") as f:
+    with path.open("r", encoding=CSV_ENCODING, newline="") as f:
         reader = csv.DictReader(f)
         for r in reader:
             rows.append(
@@ -246,7 +249,7 @@ def validate_all(refs: list[RefEntry], index_rows: list[IndexEntry], threshold: 
 
 def write_results(path: Path, rows: list[ValidationRow]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as f:
+    with path.open("w", encoding=CSV_ENCODING, newline="") as f:
         w = csv.writer(f)
         w.writerow(
             [

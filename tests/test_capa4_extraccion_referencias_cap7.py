@@ -7,6 +7,7 @@ from src.capa4_extraccion_referencias_cap7 import (
     extract_references,
     load_text,
     split_markdown_pages,
+    to_feedback_markdown,
 )
 
 
@@ -38,6 +39,16 @@ class TestCapa4ExtraccionReferenciasCap7(unittest.TestCase):
             text = load_text(docx)
             self.assertIn("Ver Tabla 2-14.", text)
             self.assertIn("Revisar Numeral 4.1.3.", text)
+
+
+    def test_to_feedback_markdown(self):
+        text = "Linea 1\n\nLinea 2"
+        md = to_feedback_markdown(text, "cap7.docx")
+
+        self.assertIn("# Documento: cap7.docx", md)
+        self.assertIn("## Página 1", md)
+        self.assertIn("Linea 1", md)
+        self.assertIn("Linea 2", md)
 
     def test_extract_references(self):
         md = """

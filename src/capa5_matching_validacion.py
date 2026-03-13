@@ -243,8 +243,13 @@ def validate_one(ref: RefEntry, index_rows: list[IndexEntry], threshold: float) 
     )
 
 
+def refs_fuera_cap7(refs: list[RefEntry]) -> list[RefEntry]:
+    return [ref for ref in refs if ref.capitulo_objetivo != "cap7"]
+
+
 def validate_all(refs: list[RefEntry], index_rows: list[IndexEntry], threshold: float) -> list[ValidationRow]:
-    return [validate_one(ref, index_rows, threshold) for ref in refs]
+    refs_filtradas = refs_fuera_cap7(refs)
+    return [validate_one(ref, index_rows, threshold) for ref in refs_filtradas]
 
 
 def write_results(path: Path, rows: list[ValidationRow]) -> None:
@@ -305,9 +310,13 @@ def main() -> int:
         print(f"ERROR: {exc}")
         return 2
 
+    refs_filtradas = refs_fuera_cap7(refs)
     results = validate_all(refs, index_rows, args.umbral_similitud)
     write_results(args.output_csv.resolve(), results)
 
+    excluidas = len(refs) - len(refs_filtradas)
+    if excluidas:
+        print(f"Referencias excluidas por pertenecer a cap7: {excluidas}")
     print(f"Validaciones generadas: {len(results)}")
     print(f"Salida: {args.output_csv.resolve()}")
     print("Resumen por estado:")

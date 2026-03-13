@@ -17,11 +17,12 @@ from pathlib import Path
 
 CSV_ENCODING = "utf-8-sig"
 
-TABLA_REGEX = re.compile(r"\b(Tabla\s+([1-7])[.-](\d+))\b", re.IGNORECASE)
-FIGURA_REGEX = re.compile(r"\b(Figura\s+([1-7])[.-](\d+))\b", re.IGNORECASE)
-GRAFICO_REGEX = re.compile(r"\b(Gr[aá]fico\s+([1-7])[.-](\d+))\b", re.IGNORECASE)
-NUMERAL_FULL_REGEX = re.compile(r"\b(Numeral\s+([1-7])((?:\.\d{1,3}){2,5}))\b", re.IGNORECASE)
+TABLA_REGEX = re.compile(r"\b(Tabla\s+([1-6])[.-](\d+))\b", re.IGNORECASE)
+FIGURA_REGEX = re.compile(r"\b(Figura\s+([1-6])[.-](\d+))\b", re.IGNORECASE)
+GRAFICO_REGEX = re.compile(r"\b(Gr[aá]fico\s+([1-6])[.-](\d+))\b", re.IGNORECASE)
+NUMERAL_FULL_REGEX = re.compile(r"\b(Numeral\s+([1-6])((?:\.\d{1,3}){2,5}))\b", re.IGNORECASE)
 NUMERAL_SHORT_REGEX = re.compile(r"\b([1-6](?:\.\d{1,3}){2,5})\b")
+CONTEXT_PAGE_REGEX = re.compile(r"(?:\d+(?:\.\d+)*)-(\d+)\s*\"?\s*$")
 
 
 @dataclass
@@ -143,66 +144,80 @@ def context_window(text: str, start: int, end: int, size: int = 90) -> str:
     return " ".join(snippet.split())
 
 
+def infer_page_from_context(context: str, default_page: int) -> int:
+    match = CONTEXT_PAGE_REGEX.search((context or "").strip())
+    if not match:
+        return default_page
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return default_page
+
+
 def detect_refs_in_paragraph(paragraph: str, page_num: int, parrafo_idx: int, source_name: str) -> list[RefCap7]:
     refs: list[RefCap7] = []
 
     for m in TABLA_REGEX.finditer(paragraph):
         chapter_num = m.group(2)
+        context = context_window(paragraph, m.start(), m.end())
         refs.append(
             RefCap7(
                 archivo=source_name,
-                pagina=page_num,
+                pagina=infer_page_from_context(context, page_num),
                 parrafo_idx=parrafo_idx,
                 tipo="tabla",
                 referencia_original=m.group(1),
                 capitulo_objetivo=f"cap{chapter_num}",
                 id_normalizado=normalize_table_figure("tabla", chapter_num, m.group(3)),
-                contexto=context_window(paragraph, m.start(), m.end()),
+                contexto=context,
             )
         )
 
     for m in FIGURA_REGEX.finditer(paragraph):
         chapter_num = m.group(2)
+        context = context_window(paragraph, m.start(), m.end())
         refs.append(
             RefCap7(
                 archivo=source_name,
-                pagina=page_num,
+                pagina=infer_page_from_context(context, page_num),
                 parrafo_idx=parrafo_idx,
                 tipo="figura",
                 referencia_original=m.group(1),
                 capitulo_objetivo=f"cap{chapter_num}",
                 id_normalizado=normalize_table_figure("figura", chapter_num, m.group(3)),
-                contexto=context_window(paragraph, m.start(), m.end()),
+                contexto=context,
             )
         )
 
     for m in GRAFICO_REGEX.finditer(paragraph):
         chapter_num = m.group(2)
+        context = context_window(paragraph, m.start(), m.end())
         refs.append(
             RefCap7(
                 archivo=source_name,
-                pagina=page_num,
+                pagina=infer_page_from_context(context, page_num),
                 parrafo_idx=parrafo_idx,
                 tipo="figura",
                 referencia_original=m.group(1),
                 capitulo_objetivo=f"cap{chapter_num}",
                 id_normalizado=normalize_table_figure("figura", chapter_num, m.group(3)),
-                contexto=context_window(paragraph, m.start(), m.end()),
+                contexto=context,
             )
         )
 
     for m in NUMERAL_FULL_REGEX.finditer(paragraph):
         chapter_num = m.group(2)
+        context = context_window(paragraph, m.start(), m.end())
         refs.append(
             RefCap7(
                 archivo=source_name,
-                pagina=page_num,
+                pagina=infer_page_from_context(context, page_num),
                 parrafo_idx=parrafo_idx,
                 tipo="numeral",
                 referencia_original=m.group(1),
                 capitulo_objetivo=f"cap{chapter_num}",
                 id_normalizado=normalize_numeral(chapter_num, m.group(3)),
-                contexto=context_window(paragraph, m.start(), m.end()),
+                contexto=context,
             )
         )
 
@@ -213,16 +228,17 @@ def detect_refs_in_paragraph(paragraph: str, page_num: int, parrafo_idx: int, so
         raw = m.group(1)
         chapter_num = raw.split(".")[0]
         suffix = raw[len(chapter_num) :]
+        context = context_window(paragraph, m.start(), m.end())
         refs.append(
             RefCap7(
                 archivo=source_name,
-                pagina=page_num,
+                pagina=infer_page_from_context(context, page_num),
                 parrafo_idx=parrafo_idx,
                 tipo="numeral",
                 referencia_original=raw,
                 capitulo_objetivo=f"cap{chapter_num}",
                 id_normalizado=normalize_numeral(chapter_num, suffix),
-                contexto=context_window(paragraph, m.start(), m.end()),
+                contexto=context,
             )
         )
 

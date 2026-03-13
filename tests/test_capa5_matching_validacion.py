@@ -3,6 +3,7 @@ import unittest
 from src.capa5_matching_validacion import (
     IndexEntry,
     RefEntry,
+    validate_all,
     validate_one,
 )
 
@@ -41,6 +42,18 @@ class TestCapa5MatchingValidacion(unittest.TestCase):
         self.assertEqual(row.estado, "REVISAR_RENUMERACION")
         self.assertEqual(row.id_match, "Tabla 2-15")
 
+
+
+    def test_validate_all_excluye_referencias_cap7(self):
+        refs = [
+            RefEntry("cap7.md", 1, 1, "tabla", "Tabla 2-14", "cap2", "Tabla 2-14", "Calidad de agua superficial"),
+            RefEntry("cap7.md", 1, 2, "tabla", "Tabla 7-1", "cap7", "Tabla 7-1", "interna cap7"),
+        ]
+
+        rows = validate_all(refs, self.index_rows, threshold=0.7)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].capitulo_objetivo, "cap2")
 
 if __name__ == "__main__":
     unittest.main()

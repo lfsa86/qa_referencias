@@ -45,6 +45,15 @@ def parse_args() -> argparse.Namespace:
         default=Path("out/referencias_cap7.csv"),
         help="Ruta salida CSV con referencias detectadas.",
     )
+    parser.add_argument(
+        "--output-markdown",
+        type=Path,
+        default=None,
+        help=(
+            "Ruta opcional para exportar cap7 en markdown (útil para feedback). "
+            "Si no se indica, se genera junto al CSV como <cap7_stem>_feedback.md"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -84,6 +93,18 @@ def load_text(path: Path) -> str:
         return clean_text(load_docx_text(path))
 
     return clean_text(path.read_text(encoding="utf-8", errors="ignore"))
+
+
+def to_feedback_markdown(text: str, source_name: str) -> str:
+    chunks = [f"# Documento: {source_name}", "", "## Página 1", ""]
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    chunks.append("\n\n".join(paragraphs) if paragraphs else "_Sin contenido extraíble._")
+    return "\n".join(chunks).rstrip() + "\n"
+
+
+def write_markdown(path: Path, markdown: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(markdown, encoding="utf-8")
 
 
 def split_markdown_pages(md_text: str) -> list[str]:
@@ -255,6 +276,11 @@ def main() -> int:
     args = parse_args()
     cap7_path = args.cap7_file.resolve()
     output_csv = args.output_csv.resolve()
+    output_markdown = (
+        args.output_markdown.resolve()
+        if args.output_markdown
+        else output_csv.with_name(f"{cap7_path.stem}_feedback.md")
+    )
 
     try:
         text = load_text(cap7_path)
@@ -264,9 +290,11 @@ def main() -> int:
 
     refs = extract_references(text, cap7_path.name)
     write_csv(output_csv, refs)
+    write_markdown(output_markdown, to_feedback_markdown(text, cap7_path.name))
 
     print(f"Referencias detectadas: {len(refs)}")
     print(f"Salida: {output_csv}")
+    print(f"Markdown feedback: {output_markdown}")
     return 0
 
 

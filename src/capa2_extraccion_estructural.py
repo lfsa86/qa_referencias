@@ -20,12 +20,12 @@ from typing import Iterable
 
 CSV_ENCODING = "utf-8-sig"
 
-TABLA_REGEX = re.compile(r"\b(Tabla\s+\d+[.-]\d+)\b", re.IGNORECASE)
-FIGURA_REGEX = re.compile(r"\b(Figura\s+\d+[.-]\d+)\b", re.IGNORECASE)
+TABLA_REGEX = re.compile(r"\b(Tabla\s+\d+(?:[.-]\d+)+)\b", re.IGNORECASE)
+FIGURA_REGEX = re.compile(r"\b(Figura\s+\d+(?:[.-]\d+)+)\b", re.IGNORECASE)
 NUMERAL_REGEX = re.compile(r"\b((?:Numeral\s+\d+(?:\.\d+)+)|(?:\d+\.\d+\.\d+))\b", re.IGNORECASE)
 HEADING_REGEX = re.compile(r"^\s*(\d+(?:\.\d+)+)\s+(.+)$")
 TOC_LINE_REGEX = re.compile(
-    r"^\s*(?P<entry>(?:Tabla|Figura)\s+\d+[.-]\d+|(?:Numeral\s+)?\d+(?:\.\d+)+)\s*"
+    r"^\s*(?P<entry>(?:Tabla|Figura)\s+\d+(?:[.-]\d+)+|(?:Numeral\s+)?\d+(?:\.\d+)+)\s*"
     r"(?:\.{2,}|\s{2,})\s*(?P<page>\d+)\s*$",
     re.IGNORECASE,
 )
@@ -110,9 +110,11 @@ def detect_referenciables(page_text: str, page_number: int, source_name: str) ->
                     )
                 )
 
+        entry_lower = entry.lower().strip()
         add_matches(TABLA_REGEX, "tabla")
         add_matches(FIGURA_REGEX, "figura")
-        add_matches(NUMERAL_REGEX, "numeral")
+        if not entry_lower.startswith(("tabla", "figura")):
+            add_matches(NUMERAL_REGEX, "numeral")
 
     return results
 

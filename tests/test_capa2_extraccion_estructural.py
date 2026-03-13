@@ -26,6 +26,14 @@ class TestCapa2Extraccion(unittest.TestCase):
         self.assertIn("figura 3.2", ids)
         self.assertIn("numeral 4.1.3", ids)
 
+
+    def test_detect_referenciables_identificador_compuesto_tabla(self):
+        page = "Tabla 3.3.6-1 ........ 7"
+        refs = detect_referenciables(page, 2, "cap3.pdf")
+        self.assertEqual(len(refs), 1)
+        self.assertEqual(refs[0].tipo, "tabla")
+        self.assertEqual(refs[0].id_detectado.lower(), "tabla 3.3.6-1")
+
     def test_pages_to_markdown(self):
         pages = ["1.1 Introducción\nTexto base", ""]
         md = pages_to_markdown(pages, "cap1.pdf")

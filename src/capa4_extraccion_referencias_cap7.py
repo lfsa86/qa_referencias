@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import csv
 import re
+import xml.etree.ElementTree as ET
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -35,7 +37,7 @@ class RefCap7:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Capa 4: extracción de referencias desde capítulo 7")
-    parser.add_argument("--cap7-file", type=Path, required=True, help="Archivo cap7 en .md o .txt")
+    parser.add_argument("--cap7-file", type=Path, required=True, help="Archivo cap7 en .md, .txt o .docx")
     parser.add_argument(
         "--output-csv",
         type=Path,
@@ -48,7 +50,32 @@ def parse_args() -> argparse.Namespace:
 def load_text(path: Path) -> str:
     if not path.exists() or not path.is_file():
         raise FileNotFoundError(f"Archivo no encontrado: {path}")
+
+    if path.suffix.lower() == ".docx":
+        return load_docx_text(path)
+
     return path.read_text(encoding="utf-8", errors="ignore")
+
+
+def load_docx_text(path: Path) -> str:
+    """Extrae texto de un .docx usando XML interno sin dependencias externas."""
+    try:
+        with zipfile.ZipFile(path) as zf:
+            xml_bytes = zf.read("word/document.xml")
+    except (KeyError, zipfile.BadZipFile, FileNotFoundError) as exc:
+        raise RuntimeError(f"No se pudo leer DOCX: {path}") from exc
+
+    root = ET.fromstring(xml_bytes)
+    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+
+    paragraphs: list[str] = []
+    for p in root.findall(".//w:p", ns):
+        runs = [node.text for node in p.findall(".//w:t", ns) if node.text]
+        text = "".join(runs).strip()
+        if text:
+            paragraphs.append(text)
+
+    return "\n\n".join(paragraphs)
 
 
 def split_markdown_pages(md_text: str) -> list[str]:

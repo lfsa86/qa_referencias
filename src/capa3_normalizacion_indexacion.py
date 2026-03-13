@@ -27,6 +27,7 @@ TYPE_MAP = {
 }
 
 CHAPTER_FROM_FILE = re.compile(r"(cap[1-7])", re.IGNORECASE)
+CHAPTER_FROM_SECTION = re.compile(r"(?<!\d)([1-7])(?:[.-]\d+)+")
 
 
 @dataclass
@@ -98,6 +99,14 @@ def chapter_from_filename(name: str) -> str:
     return m.group(1).lower()
 
 
+def chapter_from_reference(*values: str) -> str:
+    for value in values:
+        m = CHAPTER_FROM_SECTION.search(value or "")
+        if m:
+            return f"cap{m.group(1)}"
+    return "desconocido"
+
+
 def hash_text(value: str) -> str:
     return hashlib.sha1(value.encode("utf-8")).hexdigest()
 
@@ -114,6 +123,8 @@ def load_element_rows(csv_path: Path, version: str) -> list[IndexRow]:
             pagina = int(raw.get("pagina") or 0)
             archivo = (raw.get("archivo") or csv_path.name).strip()
             capitulo = chapter_from_filename(archivo)
+            if capitulo == "desconocido":
+                capitulo = chapter_from_reference(id_original, titulo)
 
             base_hash = "|".join([capitulo, tipo, id_norm, titulo])
             rows.append(

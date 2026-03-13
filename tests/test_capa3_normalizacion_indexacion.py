@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from src.capa3_normalizacion_indexacion import (
+    chapter_from_reference,
     deduplicate,
     load_element_rows,
     normalize_id,
@@ -22,6 +23,12 @@ class TestCapa3NormalizacionIndexacion(unittest.TestCase):
         self.assertEqual(normalize_id("figura", "FIGURA 3.2"), "Figura 3-2")
         self.assertEqual(normalize_id("numeral", "Numeral 4.1.3"), "4-1-3")
 
+
+    def test_chapter_from_reference(self):
+        self.assertEqual(chapter_from_reference("Tabla 3.3.6-1"), "cap3")
+        self.assertEqual(chapter_from_reference("Numeral 6.2.1"), "cap6")
+        self.assertEqual(chapter_from_reference("sin patrón"), "desconocido")
+
     def test_load_and_deduplicate(self):
         with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "cap2_elementos.csv"
@@ -30,13 +37,15 @@ class TestCapa3NormalizacionIndexacion(unittest.TestCase):
                 w.writerow(["archivo", "pagina", "tipo", "id_detectado", "titulo_o_contexto", "snippet"])
                 w.writerow(["cap2.pdf", 10, "tabla", "Tabla 2-14", "Calidad de agua", "..."])
                 w.writerow(["cap2.pdf", 10, "tabla", "Tabla 2-14", "Calidad de agua", "..."])
+                w.writerow(["folio_3.3.6.pdf", 2, "tabla", "Tabla 3.3.6-1", "Unidades", "..."])
 
             rows = load_element_rows(p, "v12")
-            self.assertEqual(len(rows), 2)
+            self.assertEqual(len(rows), 3)
             dedup = deduplicate(rows)
-            self.assertEqual(len(dedup), 1)
+            self.assertEqual(len(dedup), 2)
             self.assertEqual(dedup[0].capitulo, "cap2")
             self.assertEqual(dedup[0].version, "v12")
+            self.assertEqual(dedup[1].capitulo, "cap3")
 
 
 if __name__ == "__main__":

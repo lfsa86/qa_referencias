@@ -5,6 +5,7 @@ from pathlib import Path
 
 from src.capa4_extraccion_referencias_cap7 import (
     extract_references,
+    infer_page_from_context,
     load_text,
     split_markdown_pages,
     to_feedback_markdown,
@@ -49,6 +50,17 @@ class TestCapa4ExtraccionReferenciasCap7(unittest.TestCase):
         self.assertIn("## Página 1", md)
         self.assertIn("Linea 1", md)
         self.assertIn("Linea 2", md)
+
+
+    def test_infer_page_from_context(self):
+        self.assertEqual(infer_page_from_context("Tabla 7.2.41:Parámetros ... 7.2-20\"", 1), 20)
+        self.assertEqual(infer_page_from_context("sin patrón", 3), 3)
+
+    def test_extract_references_usa_pagina_en_contexto(self):
+        text = "Según Tabla 2.4 para detalle 7.2-20\""
+        refs = extract_references(text, "cap7.txt")
+        self.assertEqual(len(refs), 1)
+        self.assertEqual(refs[0].pagina, 20)
 
     def test_extract_references(self):
         md = """

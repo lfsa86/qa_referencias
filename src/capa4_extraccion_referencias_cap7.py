@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import csv
 import re
+import xml.etree.ElementTree as ET
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,8 +19,8 @@ CSV_ENCODING = "utf-8-sig"
 
 TABLA_REGEX = re.compile(r"\b(Tabla\s+([1-7])[.-](\d+))\b", re.IGNORECASE)
 FIGURA_REGEX = re.compile(r"\b(Figura\s+([1-7])[.-](\d+))\b", re.IGNORECASE)
-NUMERAL_FULL_REGEX = re.compile(r"\b(Numeral\s+([1-7])((?:\.\d+)+))\b", re.IGNORECASE)
-NUMERAL_SHORT_REGEX = re.compile(r"\b([1-6](?:\.\d+){2,})\b")
+NUMERAL_FULL_REGEX = re.compile(r"\b(Numeral\s+([1-7])((?:\.\d{1,3}){2,5}))\b", re.IGNORECASE)
+NUMERAL_SHORT_REGEX = re.compile(r"\b([1-6](?:\.\d{1,3}){2,5})\b")
 
 
 @dataclass
@@ -35,7 +37,7 @@ class RefCap7:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Capa 4: extracción de referencias desde capítulo 7")
-    parser.add_argument("--cap7-file", type=Path, required=True, help="Archivo cap7 en .md o .txt")
+    parser.add_argument("--cap7-file", type=Path, required=True, help="Archivo cap7 en .md, .txt o .docx")
     parser.add_argument(
         "--output-csv",
         type=Path,
@@ -45,10 +47,42 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def clean_text(text: str) -> str:
+    # Conserva saltos de línea y elimina caracteres de control no imprimibles.
+    filtered = []
+    for ch in text:
+        if ch in "\n\t" or ch.isprintable():
+            filtered.append(ch)
+        else:
+            filtered.append(" ")
+    return "".join(filtered)
+
+
+def load_docx_text(path: Path) -> str:
+    paragraphs: list[str] = []
+    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+
+    with zipfile.ZipFile(path) as zf:
+        with zf.open("word/document.xml") as doc_xml:
+            root = ET.fromstring(doc_xml.read())
+
+    for paragraph in root.findall(".//w:p", ns):
+        texts = [node.text or "" for node in paragraph.findall(".//w:t", ns)]
+        line = "".join(texts).strip()
+        if line:
+            paragraphs.append(line)
+
+    return "\n\n".join(paragraphs)
+
+
 def load_text(path: Path) -> str:
     if not path.exists() or not path.is_file():
         raise FileNotFoundError(f"Archivo no encontrado: {path}")
-    return path.read_text(encoding="utf-8", errors="ignore")
+
+    if path.suffix.lower() == ".docx":
+        return clean_text(load_docx_text(path))
+
+    return clean_text(path.read_text(encoding="utf-8", errors="ignore"))
 
 
 def split_markdown_pages(md_text: str) -> list[str]:

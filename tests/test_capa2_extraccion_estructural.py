@@ -62,5 +62,15 @@ class TestCapa2Extraccion(unittest.TestCase):
         self.assertEqual(refs[0].id_detectado.lower(), "tabla 3.3.6-2")
 
 
+    def test_detect_referenciables_grafico_en_toc(self):
+        page = "Gráfico 3.4 ....... 12\nGrafico 2-1 ........ 5"
+        refs = detect_referenciables(page, 3, "cap3.pdf")
+        tipos_ids = sorted((r.tipo, r.id_detectado.lower()) for r in refs)
+        self.assertEqual(
+            tipos_ids,
+            [("figura", "grafico 2-1"), ("figura", "gráfico 3.4")],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

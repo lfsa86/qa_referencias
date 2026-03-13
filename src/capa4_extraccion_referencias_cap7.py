@@ -95,6 +95,18 @@ def load_text(path: Path) -> str:
     return clean_text(path.read_text(encoding="utf-8", errors="ignore"))
 
 
+def format_permission_error(path: Path, exc: PermissionError) -> str:
+    return (
+        "Sin permisos para leer el archivo: "
+        f"{path}\n"
+        "Sugerencias:\n"
+        "- Cierra el documento si está abierto en Word/Excel u otra app.\n"
+        "- Si está en OneDrive, marca el archivo como 'Siempre mantener en este dispositivo'.\n"
+        "- Reintenta usando la copia ya ingestada en la carpeta input/lote_<id>.\n"
+        f"Detalle técnico: {exc}"
+    )
+
+
 def to_feedback_markdown(text: str, source_name: str) -> str:
     chunks = [f"# Documento: {source_name}", "", "## Página 1", ""]
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
@@ -287,6 +299,9 @@ def main() -> int:
     except FileNotFoundError as exc:
         print(f"ERROR: {exc}")
         return 2
+    except PermissionError as exc:
+        print(f"ERROR: {format_permission_error(cap7_path, exc)}")
+        return 3
 
     refs = extract_references(text, cap7_path.name)
     write_csv(output_csv, refs)

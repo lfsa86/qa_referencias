@@ -47,6 +47,20 @@ class TestCapa2Extraccion(unittest.TestCase):
         refs = detect_referenciables(page, 1, "cap7.pdf")
         self.assertEqual(refs, [])
 
+    def test_detect_referenciables_linea_toc_markdown_con_numero_pagina_compuesto(self):
+        page = "### 3.3.6.1.1 Intervención humana a través de actividades productivas 3.3.6-2"
+        refs = detect_referenciables(page, 2, "cap3.pdf")
+        self.assertEqual(len(refs), 1)
+        self.assertEqual(refs[0].tipo, "numeral")
+        self.assertEqual(refs[0].id_detectado, "3.3.6.1.1")
+
+    def test_detect_referenciables_linea_toc_markdown_tabla_con_pagina_compuesta(self):
+        page = "Tabla 3.3.6-2: Amenazas identificadas para hábitats 3.3.6-2"
+        refs = detect_referenciables(page, 2, "cap3.pdf")
+        self.assertEqual(len(refs), 1)
+        self.assertEqual(refs[0].tipo, "tabla")
+        self.assertEqual(refs[0].id_detectado.lower(), "tabla 3.3.6-2")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -22,13 +22,15 @@ CSV_ENCODING = "utf-8-sig"
 
 TABLA_REGEX = re.compile(r"\b(Tabla\s+\d+(?:[.-]\d+)+)\b", re.IGNORECASE)
 FIGURA_REGEX = re.compile(r"\b(Figura\s+\d+(?:[.-]\d+)+)\b", re.IGNORECASE)
-NUMERAL_REGEX = re.compile(r"\b((?:Numeral\s+\d+(?:\.\d+)+)|(?:\d+\.\d+\.\d+))\b", re.IGNORECASE)
+NUMERAL_REGEX = re.compile(
+    r"\b((?:Numeral\s+\d+(?:\.\d+)+)|(?:\d+(?:\.\d+){2,}))\b", re.IGNORECASE
+)
 HEADING_REGEX = re.compile(r"^\s*(\d+(?:\.\d+)+)\s+(.+)$")
-TOC_LINE_REGEX = re.compile(
-    r"^\s*(?P<entry>(?:Tabla|Figura)\s+\d+(?:[.-]\d+)+|(?:Numeral\s+)?\d+(?:\.\d+)+)\s*"
-    r"(?:\.{2,}|\s{2,})\s*(?P<page>\d+)\s*$",
+TOC_ENTRY_PREFIX_REGEX = re.compile(
+    r"^\s*(?:#{1,6}\s+)?(?P<entry>(?:Tabla|Figura)\s+\d+(?:[.-]\d+)+|(?:Numeral\s+)?\d+(?:\.\d+)+)\b",
     re.IGNORECASE,
 )
+TOC_PAGE_HINT_REGEX = re.compile(r"(?:\.{2,}|\s+\d+(?:\.\d+)*-\d+\s*$|\s+\d+\s*$)", re.IGNORECASE)
 
 
 @dataclass
@@ -88,13 +90,17 @@ def pages_to_markdown(pages: Iterable[str], source_name: str) -> str:
 
 def detect_referenciables(page_text: str, page_number: int, source_name: str) -> list[Referenciable]:
     results: list[Referenciable] = []
-    toc_lines = [line for line in page_text.split("\n") if TOC_LINE_REGEX.match(line)]
+    toc_lines = [
+        line
+        for line in page_text.split("\n")
+        if TOC_ENTRY_PREFIX_REGEX.match(line) and TOC_PAGE_HINT_REGEX.search(line)
+    ]
 
     if not toc_lines:
         return results
 
     for toc_line in toc_lines:
-        entry = TOC_LINE_REGEX.match(toc_line).group("entry")  # type: ignore[union-attr]
+        entry = TOC_ENTRY_PREFIX_REGEX.match(toc_line).group("entry")  # type: ignore[union-attr]
 
         def add_matches(pattern: re.Pattern[str], tipo: str) -> None:
             for match in pattern.finditer(entry):

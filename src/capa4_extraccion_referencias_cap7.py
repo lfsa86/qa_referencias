@@ -19,6 +19,7 @@ CSV_ENCODING = "utf-8-sig"
 
 TABLA_REGEX = re.compile(r"\b(Tabla\s+([1-7])[.-](\d+))\b", re.IGNORECASE)
 FIGURA_REGEX = re.compile(r"\b(Figura\s+([1-7])[.-](\d+))\b", re.IGNORECASE)
+GRAFICO_REGEX = re.compile(r"\b(Gr[aá]fico\s+([1-7])[.-](\d+))\b", re.IGNORECASE)
 NUMERAL_FULL_REGEX = re.compile(r"\b(Numeral\s+([1-7])((?:\.\d{1,3}){2,5}))\b", re.IGNORECASE)
 NUMERAL_SHORT_REGEX = re.compile(r"\b([1-6](?:\.\d{1,3}){2,5})\b")
 
@@ -128,6 +129,21 @@ def detect_refs_in_paragraph(paragraph: str, page_num: int, parrafo_idx: int, so
         )
 
     for m in FIGURA_REGEX.finditer(paragraph):
+        chapter_num = m.group(2)
+        refs.append(
+            RefCap7(
+                archivo=source_name,
+                pagina=page_num,
+                parrafo_idx=parrafo_idx,
+                tipo="figura",
+                referencia_original=m.group(1),
+                capitulo_objetivo=f"cap{chapter_num}",
+                id_normalizado=normalize_table_figure("figura", chapter_num, m.group(3)),
+                contexto=context_window(paragraph, m.start(), m.end()),
+            )
+        )
+
+    for m in GRAFICO_REGEX.finditer(paragraph):
         chapter_num = m.group(2)
         refs.append(
             RefCap7(

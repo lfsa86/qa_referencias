@@ -44,7 +44,7 @@ class TestCapa4ExtraccionReferenciasCap7(unittest.TestCase):
 # Documento: cap7.pdf
 
 ## Página 1
-Según la Tabla 2-14 y Figura 3.2, los impactos son moderados.
+Según la Tabla 2-14, Figura 3.2 y Gráfico 6-4, los impactos son moderados.
 
 Además, revisar Numeral 4.1.3 y 5.2.1 para completar análisis.
 
@@ -56,6 +56,7 @@ Sin referencias.
 
         self.assertIn(("tabla", "Tabla 2-14", "cap2"), tipos_ids)
         self.assertIn(("figura", "Figura 3-2", "cap3"), tipos_ids)
+        self.assertIn(("figura", "Figura 6-4", "cap6"), tipos_ids)
         self.assertIn(("numeral", "4-1-3", "cap4"), tipos_ids)
         self.assertIn(("numeral", "5-2-1", "cap5"), tipos_ids)
 

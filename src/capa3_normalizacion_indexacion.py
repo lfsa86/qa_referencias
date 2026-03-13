@@ -19,6 +19,8 @@ CSV_ENCODING = "utf-8-sig"
 TYPE_MAP = {
     "tabla": "tabla",
     "figura": "figura",
+    "grafico": "figura",
+    "gráfico": "figura",
     "numeral": "numeral",
     "item": "item",
     "ítem": "item",

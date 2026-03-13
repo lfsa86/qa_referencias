@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Capa 2 - Extracción estructural (PDF -> Markdown).
+"""Capa 2 - Extracción estructural (PDF/DOCX -> Markdown).
 
 Submódulos incluidos:
 - 2.1 Extracción de texto y bloques (texto por página).
@@ -13,9 +13,11 @@ from __future__ import annotations
 import argparse
 import csv
 import re
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
+from xml.etree import ElementTree as ET
 
 
 CSV_ENCODING = "utf-8-sig"
@@ -45,8 +47,8 @@ class Referenciable:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Capa 2: PDF -> Markdown + elementos referenciables")
-    parser.add_argument("--input-dir", type=Path, required=True, help="Directorio con PDFs de entrada")
+    parser = argparse.ArgumentParser(description="Capa 2: PDF/DOCX -> Markdown + elementos referenciables")
+    parser.add_argument("--input-dir", type=Path, required=True, help="Directorio con PDFs/DOCX de entrada")
     parser.add_argument("--output-dir", type=Path, default=Path("out/capa2"), help="Directorio de salida")
     return parser.parse_args()
 
@@ -65,6 +67,27 @@ def extract_text_pages(pdf_path: Path) -> list[str]:
         text = page.extract_text() or ""
         pages.append(normalize_text(text))
     return pages
+
+
+def extract_docx_pages(docx_path: Path) -> list[str]:
+    """Extrae texto de DOCX como una sola "página" lógica."""
+    with zipfile.ZipFile(docx_path) as zf:
+        try:
+            xml_content = zf.read("word/document.xml")
+        except KeyError as exc:
+            raise RuntimeError(f"DOCX inválido o dañado: {docx_path}") from exc
+
+    root = ET.fromstring(xml_content)
+    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+    paragraphs: list[str] = []
+
+    for paragraph in root.findall(".//w:p", ns):
+        runs = paragraph.findall(".//w:t", ns)
+        text = "".join(run.text or "" for run in runs).strip()
+        if text:
+            paragraphs.append(text)
+
+    return [normalize_text("\n".join(paragraphs))]
 
 
 def normalize_text(text: str) -> str:
@@ -148,16 +171,22 @@ def write_elements_csv(csv_path: Path, rows: list[Referenciable]) -> None:
             writer.writerow([r.archivo, r.pagina, r.tipo, r.id_detectado, r.titulo_o_contexto, r.snippet])
 
 
-def process_pdf(pdf_path: Path, output_dir: Path) -> tuple[Path, Path, int]:
-    pages = extract_text_pages(pdf_path)
-    markdown = pages_to_markdown(pages, pdf_path.name)
+def process_document(doc_path: Path, output_dir: Path) -> tuple[Path, Path, int]:
+    if doc_path.suffix.lower() == ".pdf":
+        pages = extract_text_pages(doc_path)
+    elif doc_path.suffix.lower() == ".docx":
+        pages = extract_docx_pages(doc_path)
+    else:
+        raise RuntimeError(f"Formato no soportado en Capa 2: {doc_path.name}")
+
+    markdown = pages_to_markdown(pages, doc_path.name)
 
     elementos: list[Referenciable] = []
     for i, page_text in enumerate(pages, start=1):
-        elementos.extend(detect_referenciables(page_text, i, pdf_path.name))
+        elementos.extend(detect_referenciables(page_text, i, doc_path.name))
 
-    md_path = output_dir / "markdown" / f"{pdf_path.stem}.md"
-    csv_path = output_dir / "elementos" / f"{pdf_path.stem}_elementos.csv"
+    md_path = output_dir / "markdown" / f"{doc_path.stem}.md"
+    csv_path = output_dir / "elementos" / f"{doc_path.stem}_elementos.csv"
     write_markdown(md_path, markdown)
     write_elements_csv(csv_path, elementos)
     return md_path, csv_path, len(elementos)
@@ -172,18 +201,24 @@ def main() -> int:
         print(f"ERROR: input-dir inválido: {input_dir}")
         return 2
 
-    pdfs = sorted([p for p in input_dir.iterdir() if p.is_file() and p.suffix.lower() == ".pdf"])
-    if not pdfs:
-        print(f"ERROR: no se encontraron PDFs en {input_dir}")
+    supported = sorted(
+        [p for p in input_dir.iterdir() if p.is_file() and p.suffix.lower() in {".pdf", ".docx"}]
+    )
+    if not supported:
+        print(f"ERROR: no se encontraron archivos soportados (.pdf/.docx) en {input_dir}")
         return 2
 
-    total_elements = 0
-    for pdf in pdfs:
-        md, csv_path, count = process_pdf(pdf, output_dir)
-        total_elements += count
-        print(f"OK: {pdf.name} -> {md} | {csv_path} | elementos={count}")
+    unsupported_docs = sorted([p.name for p in input_dir.iterdir() if p.is_file() and p.suffix.lower() == ".doc"])
+    if unsupported_docs:
+        print(f"AVISO: archivos .doc no soportados en Capa 2 (omitiendo): {', '.join(unsupported_docs)}")
 
-    print(f"Resumen: pdfs={len(pdfs)} elementos={total_elements} output={output_dir}")
+    total_elements = 0
+    for doc in supported:
+        md, csv_path, count = process_document(doc, output_dir)
+        total_elements += count
+        print(f"OK: {doc.name} -> {md} | {csv_path} | elementos={count}")
+
+    print(f"Resumen: documentos={len(supported)} elementos={total_elements} output={output_dir}")
     return 0
 
 

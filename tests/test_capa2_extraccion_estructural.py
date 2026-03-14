@@ -107,6 +107,19 @@ class TestCapa2Extraccion(unittest.TestCase):
         self.assertEqual(refs[0].tipo, "tabla")
         self.assertEqual(refs[0].id_detectado.lower(), "tabla 3.3.6-2")
 
+    def test_detect_referenciables_variantes_pic_lo_anexo(self):
+        page = (
+            "Figura PIC 5.2.4.1.7.2-1: Manejo de aguas 5.2.4.1.7-124\n"
+            "Tabla LO 5.2.4.1.7.2-1: Reducción del flujo base 5.2.4.1.7-127\n"
+            "Anexo PIC 5.2.4.1.7.4: Resultados de simulaciones 5.2.4.1.7-240"
+        )
+        refs = detect_referenciables(page, 5, "cap5.pdf")
+        tipos_ids = sorted((r.tipo, r.id_detectado.lower()) for r in refs)
+
+        self.assertIn(("figura", "figura pic 5.2.4.1.7.2-1"), tipos_ids)
+        self.assertIn(("tabla", "tabla lo 5.2.4.1.7.2-1"), tipos_ids)
+        self.assertIn(("anexo", "anexo pic 5.2.4.1.7.4"), tipos_ids)
+
 
     def test_detect_referenciables_grafico_en_toc(self):
         page = "Gráfico 3.4 ....... 12\nGrafico 2-1 ........ 5"

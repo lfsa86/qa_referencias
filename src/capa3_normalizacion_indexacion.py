@@ -21,6 +21,7 @@ TYPE_MAP = {
     "figura": "figura",
     "grafico": "figura",
     "gráfico": "figura",
+    "mapa": "mapa",
     "numeral": "numeral",
     "item": "item",
     "ítem": "item",
@@ -29,6 +30,9 @@ TYPE_MAP = {
 }
 
 CHAPTER_FROM_FILE = re.compile(r"(cap[1-7])", re.IGNORECASE)
+
+ALLOWED_INDEX_TYPES = {"tabla", "figura", "mapa"}
+
 CHAPTER_FROM_SECTION = re.compile(r"(?<!\d)([1-7])(?:[.-]\d+)+")
 
 
@@ -119,6 +123,9 @@ def load_element_rows(csv_path: Path, version: str) -> list[IndexRow]:
         reader = csv.DictReader(f)
         for raw in reader:
             tipo = normalize_type(raw.get("tipo", ""))
+            if tipo not in ALLOWED_INDEX_TYPES:
+                continue
+
             id_original = (raw.get("id_detectado") or "").strip()
             id_norm = normalize_id(tipo, id_original)
             titulo = (raw.get("titulo_o_contexto") or "").strip()

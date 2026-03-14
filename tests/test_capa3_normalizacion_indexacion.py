@@ -17,6 +17,7 @@ class TestCapa3NormalizacionIndexacion(unittest.TestCase):
         self.assertEqual(normalize_type("ítem"), "item")
         self.assertEqual(normalize_type("sección"), "seccion")
         self.assertEqual(normalize_type("tabla"), "tabla")
+        self.assertEqual(normalize_type("mapa"), "mapa")
 
     def test_normalize_id(self):
         self.assertEqual(normalize_id("tabla", "tabla 2.14"), "Tabla 2-14")
@@ -39,13 +40,19 @@ class TestCapa3NormalizacionIndexacion(unittest.TestCase):
                 w.writerow(["cap2.pdf", 10, "tabla", "Tabla 2-14", "Calidad de agua", "..."])
                 w.writerow(["folio_3.3.6.pdf", 2, "tabla", "Tabla 3.3.6-1", "Unidades", "..."])
 
+            with p.open("a", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                w.writerow(["cap2.pdf", 12, "numeral", "Numeral 2.1.3", "Sección", "..."])
+                w.writerow(["cap4.pdf", 6, "mapa", "Mapa 4.2", "Cobertura", "..."])
+
             rows = load_element_rows(p, "v12")
-            self.assertEqual(len(rows), 3)
+            self.assertEqual(len(rows), 4)
             dedup = deduplicate(rows)
-            self.assertEqual(len(dedup), 2)
+            self.assertEqual(len(dedup), 3)
             self.assertEqual(dedup[0].capitulo, "cap2")
             self.assertEqual(dedup[0].version, "v12")
             self.assertEqual(dedup[1].capitulo, "cap3")
+            self.assertEqual(dedup[2].tipo, "mapa")
 
 
 if __name__ == "__main__":

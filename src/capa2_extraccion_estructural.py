@@ -27,6 +27,7 @@ CSV_ENCODING = "utf-8-sig"
 TABLA_REGEX = re.compile(r"\b(Tabla\s+\d+(?:[.-]\d+)+)\b", re.IGNORECASE)
 FIGURA_REGEX = re.compile(r"\b(Figura\s+\d+(?:[.-]\d+)+)\b", re.IGNORECASE)
 GRAFICO_REGEX = re.compile(r"\b(Gr[aá]fico\s+\d+(?:[.-]\d+)+)\b", re.IGNORECASE)
+MAPA_REGEX = re.compile(r"\b(Mapa\s+\d+(?:[.-]\d+)+)\b", re.IGNORECASE)
 NUMERAL_REGEX = re.compile(
     r"\b((?:Numeral\s+\d+(?:\.\d+)+)|(?:\d+(?:\.\d+){2,}))\b", re.IGNORECASE
 )
@@ -34,7 +35,7 @@ HEADING_REGEX = re.compile(r"^\s*(\d+(?:\.\d+)+)\s+(.+)$")
 NUM_HEADING_GLUE_REGEX = re.compile(r"^\s*(\d+(?:\.\d+){1,10})([A-ZÁÉÍÓÚÑ].+)$")
 CAPITULO_REGEX = re.compile(r"^\s*cap[ií]tulo\s+[ivxlcdm\d]+\b", re.IGNORECASE)
 TOC_ENTRY_PREFIX_REGEX = re.compile(
-    r"^\s*(?:#{1,6}\s+)?(?P<entry>(?:Tabla|Figura|Gr[aá]fico)\s+\d+(?:[.-]\d+)+|(?:Numeral\s+)?\d+(?:\.\d+)+)\b",
+    r"^\s*(?:#{1,6}\s+)?(?P<entry>(?:Tabla|Figura|Gr[aá]fico|Mapa)\s+\d+(?:[.-]\d+)+|(?:Numeral\s+)?\d+(?:\.\d+)+)\b",
     re.IGNORECASE,
 )
 TOC_PAGE_HINT_REGEX = re.compile(r"(?:\.{2,}|\s+\d+(?:\.\d+)*-\d+\s*$|\s+\d+\s*$)", re.IGNORECASE)
@@ -240,7 +241,8 @@ def detect_referenciables(page_text: str, page_number: int, source_name: str) ->
         add_matches(TABLA_REGEX, "tabla")
         add_matches(FIGURA_REGEX, "figura")
         add_matches(GRAFICO_REGEX, "figura")
-        if not entry_lower.startswith(("tabla", "figura", "gráfico", "grafico")):
+        add_matches(MAPA_REGEX, "mapa")
+        if not entry_lower.startswith(("tabla", "figura", "gráfico", "grafico", "mapa")):
             add_matches(NUMERAL_REGEX, "numeral")
 
     return results

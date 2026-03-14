@@ -1,0 +1,11 @@
+# Entorno
+.env
+.env.*
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Salidas del pipeline
+out/
+input/

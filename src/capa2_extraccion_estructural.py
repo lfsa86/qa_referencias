@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import re
+import time
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,11 +31,15 @@ NUMERAL_REGEX = re.compile(
     r"\b((?:Numeral\s+\d+(?:\.\d+)+)|(?:\d+(?:\.\d+){2,}))\b", re.IGNORECASE
 )
 HEADING_REGEX = re.compile(r"^\s*(\d+(?:\.\d+)+)\s+(.+)$")
+NUM_HEADING_GLUE_REGEX = re.compile(r"^\s*(\d+(?:\.\d+){1,10})([A-ZÁÉÍÓÚÑ].+)$")
+CAPITULO_REGEX = re.compile(r"^\s*cap[ií]tulo\s+[ivxlcdm\d]+\b", re.IGNORECASE)
 TOC_ENTRY_PREFIX_REGEX = re.compile(
     r"^\s*(?:#{1,6}\s+)?(?P<entry>(?:Tabla|Figura|Gr[aá]fico)\s+\d+(?:[.-]\d+)+|(?:Numeral\s+)?\d+(?:\.\d+)+)\b",
     re.IGNORECASE,
 )
 TOC_PAGE_HINT_REGEX = re.compile(r"(?:\.{2,}|\s+\d+(?:\.\d+)*-\d+\s*$|\s+\d+\s*$)", re.IGNORECASE)
+TOC_TITLE_MARKERS = ("tabla de contenidos", "contenido", "índice", "indice")
+TOC_GLUE_LINE_REGEX = re.compile(r"^\s*\d+(?:\.\d+){1,10}[A-ZÁÉÍÓÚÑ].*\d+(?:\.\d+)*-\d+\s*$")
 
 
 @dataclass
@@ -50,6 +56,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Capa 2: PDF/DOCX -> Markdown + elementos referenciables")
     parser.add_argument("--input-dir", type=Path, required=True, help="Directorio con PDFs/DOCX de entrada")
     parser.add_argument("--output-dir", type=Path, default=Path("out/capa2"), help="Directorio de salida")
+    parser.add_argument(
+        "--ocr-engine",
+        choices=["pypdf", "mistral"],
+        default="pypdf",
+        help="Motor OCR/texto para PDFs. `mistral` usa MISTRAL_API_KEY del entorno.",
+    )
     return parser.parse_args()
 
 
@@ -67,6 +79,33 @@ def extract_text_pages(pdf_path: Path) -> list[str]:
         text = page.extract_text() or ""
         pages.append(normalize_text(text))
     return pages
+
+
+def extract_text_pages_mistral(pdf_path: Path) -> list[str]:
+    """Extrae texto por página con Mistral OCR si hay API key configurada."""
+    api_key = os.getenv("MISTRAL_API_KEY")
+    if not api_key:
+        raise RuntimeError("No se encontró MISTRAL_API_KEY en el entorno para usar OCR de Mistral.")
+
+    try:
+        from mistralai import Mistral  # type: ignore
+    except ImportError as exc:
+        raise RuntimeError(
+            "Dependencia faltante: instala `mistralai` (pip install mistralai) para usar OCR de Mistral."
+        ) from exc
+
+    client = Mistral(api_key=api_key)
+    with pdf_path.open("rb") as f:
+        uploaded = client.files.upload(file={"file_name": pdf_path.name, "content": f}, purpose="ocr")
+
+    signed = client.files.get_signed_url(file_id=uploaded.id)
+    time.sleep(0.5)
+    ocr_response = client.ocr.process(
+        model="mistral-ocr-latest",
+        document={"type": "document_url", "document_url": signed.url},
+    )
+
+    return [normalize_text(page.markdown or "") for page in ocr_response.pages]
 
 
 def extract_docx_pages(docx_path: Path) -> list[str]:
@@ -103,13 +142,70 @@ def pages_to_markdown(pages: Iterable[str], source_name: str) -> str:
         if not page_text.strip():
             chunks.append("_Página sin texto extraíble._")
             continue
-        for line in page_text.split("\n"):
-            m = HEADING_REGEX.match(line)
-            if m:
-                chunks.append(f"### {m.group(1)} {m.group(2).strip()}")
-            else:
-                chunks.append(line)
+        page_lines = remove_toc_noise(page_text.split("\n"))
+        for line in page_lines:
+            chunks.append(format_heading_line(line))
     return "\n".join(chunks).strip() + "\n"
+
+
+def format_heading_line(line: str) -> str:
+    stripped = line.strip()
+    if not stripped:
+        return ""
+
+    if CAPITULO_REGEX.match(stripped):
+        return f"# {stripped}"
+
+    glued = NUM_HEADING_GLUE_REGEX.match(stripped)
+    if glued:
+        stripped = f"{glued.group(1)} {glued.group(2).strip()}"
+
+    m = HEADING_REGEX.match(stripped)
+    if m:
+        depth = min(6, max(3, len(m.group(1).split(".")) + 1))
+        return f"{'#' * depth} {m.group(1)} {m.group(2).strip()}"
+
+    return line
+
+
+def remove_toc_noise(lines: list[str]) -> list[str]:
+    """Descarta líneas de TOC para no convertirlas en headings del cuerpo."""
+    if not lines:
+        return lines
+
+    if not is_likely_toc_page(lines):
+        return lines
+
+    cleaned: list[str] = []
+    for line in lines:
+        if TOC_ENTRY_PREFIX_REGEX.match(line) and TOC_PAGE_HINT_REGEX.search(line):
+            continue
+        if TOC_GLUE_LINE_REGEX.match(line):
+            continue
+        cleaned.append(line)
+    return cleaned
+
+
+def is_likely_toc_page(lines: list[str]) -> bool:
+    normalized = [ln.strip().lower() for ln in lines if ln.strip()]
+    if not normalized:
+        return False
+
+    has_toc_marker = any(any(marker in ln for marker in TOC_TITLE_MARKERS) for ln in normalized)
+    toc_entries = sum(
+        1
+        for ln in lines
+        if (TOC_ENTRY_PREFIX_REGEX.match(ln) and TOC_PAGE_HINT_REGEX.search(ln)) or TOC_GLUE_LINE_REGEX.match(ln)
+    )
+    dotted_lines = sum(1 for ln in lines if re.search(r"\.{2,}\s*\d+\s*$", ln))
+
+    if toc_entries >= 4:
+        return True
+    if has_toc_marker and toc_entries >= 2:
+        return True
+    if dotted_lines >= 6 and toc_entries >= 2:
+        return True
+    return False
 
 
 def detect_referenciables(page_text: str, page_number: int, source_name: str) -> list[Referenciable]:
@@ -171,9 +267,9 @@ def write_elements_csv(csv_path: Path, rows: list[Referenciable]) -> None:
             writer.writerow([r.archivo, r.pagina, r.tipo, r.id_detectado, r.titulo_o_contexto, r.snippet])
 
 
-def process_document(doc_path: Path, output_dir: Path) -> tuple[Path, Path, int]:
+def process_document(doc_path: Path, output_dir: Path, ocr_engine: str = "pypdf") -> tuple[Path, Path, int]:
     if doc_path.suffix.lower() == ".pdf":
-        pages = extract_text_pages(doc_path)
+        pages = extract_text_pages_mistral(doc_path) if ocr_engine == "mistral" else extract_text_pages(doc_path)
     elif doc_path.suffix.lower() == ".docx":
         pages = extract_docx_pages(doc_path)
     else:
@@ -214,7 +310,7 @@ def main() -> int:
 
     total_elements = 0
     for doc in supported:
-        md, csv_path, count = process_document(doc, output_dir)
+        md, csv_path, count = process_document(doc, output_dir, ocr_engine=args.ocr_engine)
         total_elements += count
         print(f"OK: {doc.name} -> {md} | {csv_path} | elementos={count}")
 

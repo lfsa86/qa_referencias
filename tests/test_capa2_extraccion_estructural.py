@@ -2,8 +2,11 @@ import unittest
 
 from src.capa2_extraccion_estructural import (
     detect_referenciables,
+    format_heading_line,
+    is_likely_toc_page,
     normalize_text,
     pages_to_markdown,
+    remove_toc_noise,
 )
 
 
@@ -41,6 +44,22 @@ class TestCapa2Extraccion(unittest.TestCase):
         self.assertIn("## Página 1", md)
         self.assertIn("### 1.1 Introducción", md)
         self.assertIn("_Página sin texto extraíble._", md)
+
+    def test_format_heading_line_numero_pegado_a_titulo(self):
+        line = "5.2.4.1.7.2Hidrología: Impacto RH-2"
+        formatted = format_heading_line(line)
+        self.assertEqual(formatted, "###### 5.2.4.1.7.2 Hidrología: Impacto RH-2")
+
+    def test_remove_toc_noise_descarta_entradas_toc(self):
+        lines = [
+            "Tabla de contenidos",
+            "5.2.4.1.7.2Hidrología: Impacto RH-2 Cambio del régimen hidrológico y caudal5.2.4.1.7-106",
+            "5.2.4.1.7.2.1Metodología para el análisis de impacto5.2.4.1.7-106",
+            "Texto cuerpo real",
+        ]
+        cleaned = remove_toc_noise(lines)
+        self.assertEqual(cleaned, ["Tabla de contenidos", "Texto cuerpo real"])
+        self.assertTrue(is_likely_toc_page(lines))
 
     def test_detect_referenciables_solo_tabla_contenido(self):
         page = "Texto narrativo con Tabla 2-14 y Figura 3.2, sin puntos guía ni paginación"

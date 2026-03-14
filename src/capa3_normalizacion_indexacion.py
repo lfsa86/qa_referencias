@@ -31,7 +31,7 @@ TYPE_MAP = {
 
 CHAPTER_FROM_FILE = re.compile(r"(cap[1-7])", re.IGNORECASE)
 
-ALLOWED_INDEX_TYPES = {"tabla", "figura", "mapa"}
+ALLOWED_INDEX_TYPES = {"tabla", "figura", "mapa", "numeral"}
 
 CHAPTER_FROM_SECTION = re.compile(r"(?<!\d)([1-7])(?:[.-]\d+)+")
 

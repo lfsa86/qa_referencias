@@ -20,6 +20,9 @@ CSV_ENCODING = "utf-8-sig"
 TABLA_REGEX = re.compile(r"\b(Tabla\s+([1-6])[.-](\d+))\b", re.IGNORECASE)
 FIGURA_REGEX = re.compile(r"\b(Figura\s+([1-6])[.-](\d+))\b", re.IGNORECASE)
 GRAFICO_REGEX = re.compile(r"\b(Gr[aá]fico\s+([1-6])[.-](\d+))\b", re.IGNORECASE)
+FIGURA_PIC_REGEX = re.compile(r"\b(Figura\s+PIC\s+([1-6](?:[.-]\d+)+))\b", re.IGNORECASE)
+TABLA_LO_REGEX = re.compile(r"\b(Tabla\s+LO\s+([1-6](?:[.-]\d+)+))\b", re.IGNORECASE)
+ANEXO_PIC_REGEX = re.compile(r"\b(Anexo\s+PIC\s+([1-6](?:[.-]\d+)+))\b", re.IGNORECASE)
 NUMERAL_FULL_REGEX = re.compile(r"\b(Numeral\s+([1-6])((?:\.\d{1,3}){2,5}))\b", re.IGNORECASE)
 NUMERAL_SHORT_REGEX = re.compile(r"\b([1-6](?:\.\d{1,3}){2,5})\b")
 CONTEXT_PAGE_REGEX = re.compile(r"(?:\d+(?:\.\d+)*)-(\d+)\s*\"?\s*$")
@@ -139,6 +142,11 @@ def normalize_numeral(chapter_num: str, suffix: str) -> str:
     return f"{chapter_num}{suffix.replace('.', '-')}"
 
 
+def normalize_special_reference(prefix: str, section_id: str) -> str:
+    normalized_id = section_id.replace(".", "-")
+    return f"{prefix} {normalized_id}"
+
+
 def context_window(text: str, start: int, end: int, size: int = 90) -> str:
     snippet = text[max(0, start - size) : min(len(text), end + size)]
     return " ".join(snippet.split())
@@ -201,6 +209,54 @@ def detect_refs_in_paragraph(paragraph: str, page_num: int, parrafo_idx: int, so
                 referencia_original=m.group(1),
                 capitulo_objetivo=f"cap{chapter_num}",
                 id_normalizado=normalize_table_figure("figura", chapter_num, m.group(3)),
+                contexto=context,
+            )
+        )
+
+    for m in FIGURA_PIC_REGEX.finditer(paragraph):
+        chapter_num = m.group(2).split(".")[0].split("-")[0]
+        context = context_window(paragraph, m.start(), m.end())
+        refs.append(
+            RefCap7(
+                archivo=source_name,
+                pagina=infer_page_from_context(context, page_num),
+                parrafo_idx=parrafo_idx,
+                tipo="figura",
+                referencia_original=m.group(1),
+                capitulo_objetivo=f"cap{chapter_num}",
+                id_normalizado=normalize_special_reference("Figura PIC", m.group(2)),
+                contexto=context,
+            )
+        )
+
+    for m in TABLA_LO_REGEX.finditer(paragraph):
+        chapter_num = m.group(2).split(".")[0].split("-")[0]
+        context = context_window(paragraph, m.start(), m.end())
+        refs.append(
+            RefCap7(
+                archivo=source_name,
+                pagina=infer_page_from_context(context, page_num),
+                parrafo_idx=parrafo_idx,
+                tipo="tabla",
+                referencia_original=m.group(1),
+                capitulo_objetivo=f"cap{chapter_num}",
+                id_normalizado=normalize_special_reference("Tabla LO", m.group(2)),
+                contexto=context,
+            )
+        )
+
+    for m in ANEXO_PIC_REGEX.finditer(paragraph):
+        chapter_num = m.group(2).split(".")[0].split("-")[0]
+        context = context_window(paragraph, m.start(), m.end())
+        refs.append(
+            RefCap7(
+                archivo=source_name,
+                pagina=infer_page_from_context(context, page_num),
+                parrafo_idx=parrafo_idx,
+                tipo="anexo",
+                referencia_original=m.group(1),
+                capitulo_objetivo=f"cap{chapter_num}",
+                id_normalizado=normalize_special_reference("Anexo PIC", m.group(2)),
                 contexto=context,
             )
         )

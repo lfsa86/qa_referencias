@@ -83,6 +83,19 @@ Sin referencias.
         self.assertIn(("numeral", "4-1-3", "cap4"), tipos_ids)
         self.assertIn(("numeral", "5-2-1", "cap5"), tipos_ids)
 
+    def test_extract_references_detecta_referencias_especiales(self):
+        text = (
+            "Figura PIC 5.2.4.1.7.2-1: Manejo de aguas.\n"
+            "Tabla LO 5.2.4.1.7.2-2: Caudales medios.\n"
+            "Anexo PIC 5.2.4.1.7.4: Resultados de simulaciones."
+        )
+        refs = extract_references(text, "cap7.txt")
+        tipos_ids = {(r.tipo, r.id_normalizado, r.capitulo_objetivo) for r in refs}
+
+        self.assertIn(("figura", "Figura PIC 5-2-4-1-7-2-1", "cap5"), tipos_ids)
+        self.assertIn(("tabla", "Tabla LO 5-2-4-1-7-2-2", "cap5"), tipos_ids)
+        self.assertIn(("anexo", "Anexo PIC 5-2-4-1-7-4", "cap5"), tipos_ids)
+
 
     def test_extract_references_ignora_numerales_ruidosos(self):
         text = "Ruido 2.2.20515151515151 y referencia válida 4.3.2 en el mismo párrafo."

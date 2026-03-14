@@ -66,6 +66,39 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def load_env_var_from_dotenv(var_name: str, candidate_paths: list[Path]) -> str | None:
+    """Busca una variable en archivos .env y retorna su valor si existe."""
+    for env_path in candidate_paths:
+        if not env_path.exists() or not env_path.is_file():
+            continue
+
+        try:
+            lines = env_path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+
+        for raw_line in lines:
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            if line.startswith("export "):
+                line = line[len("export ") :].strip()
+
+            key, sep, value = line.partition("=")
+            if not sep:
+                continue
+
+            if key.strip() != var_name:
+                continue
+
+            clean_value = value.strip().strip('"').strip("'")
+            if clean_value:
+                return clean_value
+
+    return None
+
+
 def extract_text_pages(pdf_path: Path) -> list[str]:
     try:
         from pypdf import PdfReader  # type: ignore
@@ -310,9 +343,29 @@ def main() -> int:
     if unsupported_docs:
         print(f"AVISO: archivos .doc no soportados en Capa 2 (omitiendo): {', '.join(unsupported_docs)}")
 
+    selected_ocr_engine = args.ocr_engine
+    if selected_ocr_engine == "mistral" and not os.getenv("MISTRAL_API_KEY"):
+        repo_root = Path(__file__).resolve().parent.parent
+        env_candidates = [
+            Path.cwd() / ".env",
+            input_dir.parent.parent / ".env",
+            output_dir.parent.parent / ".env",
+            repo_root / ".env",
+        ]
+        loaded_key = load_env_var_from_dotenv("MISTRAL_API_KEY", env_candidates)
+        if loaded_key:
+            os.environ["MISTRAL_API_KEY"] = loaded_key
+            print("INFO: MISTRAL_API_KEY cargada desde archivo .env.")
+
+    if selected_ocr_engine == "mistral" and not os.getenv("MISTRAL_API_KEY"):
+        print(
+            "AVISO: no se encontró MISTRAL_API_KEY en entorno ni en .env; se usará `pypdf` en su lugar para extraer texto de PDFs."
+        )
+        selected_ocr_engine = "pypdf"
+
     total_elements = 0
     for doc in supported:
-        md, csv_path, count = process_document(doc, output_dir, ocr_engine=args.ocr_engine)
+        md, csv_path, count = process_document(doc, output_dir, ocr_engine=selected_ocr_engine)
         total_elements += count
         print(f"OK: {doc.name} -> {md} | {csv_path} | elementos={count}")
 

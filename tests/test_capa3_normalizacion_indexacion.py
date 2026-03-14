@@ -46,13 +46,14 @@ class TestCapa3NormalizacionIndexacion(unittest.TestCase):
                 w.writerow(["cap4.pdf", 6, "mapa", "Mapa 4.2", "Cobertura", "..."])
 
             rows = load_element_rows(p, "v12")
-            self.assertEqual(len(rows), 4)
+            self.assertEqual(len(rows), 5)
             dedup = deduplicate(rows)
-            self.assertEqual(len(dedup), 3)
+            self.assertEqual(len(dedup), 4)
             self.assertEqual(dedup[0].capitulo, "cap2")
             self.assertEqual(dedup[0].version, "v12")
             self.assertEqual(dedup[1].capitulo, "cap3")
-            self.assertEqual(dedup[2].tipo, "mapa")
+            self.assertEqual(dedup[2].tipo, "numeral")
+            self.assertEqual(dedup[3].tipo, "mapa")
 
 
 if __name__ == "__main__":

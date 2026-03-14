@@ -61,7 +61,32 @@ def parse_args() -> argparse.Namespace:
         help="Incluye cap7 al construir índice maestro en Capa 3",
     )
     parser.add_argument("--strict", action="store_true", help="Activa --strict en Capa 1")
+    parser.add_argument(
+        "--ocr-engine",
+        choices=["pypdf", "mistral"],
+        default=None,
+        help=(
+            "Motor de extracción/OCR para Capa 2. "
+            "Si no se indica, el orquestador lo preguntará en modo interactivo."
+        ),
+    )
     return parser.parse_args()
+
+
+def select_ocr_engine(explicit_engine: str | None) -> str:
+    if explicit_engine in {"pypdf", "mistral"}:
+        return explicit_engine
+
+    prompt = "Selecciona motor OCR para Capa 2 ([1] pypdf, [2] mistral): "
+    options = {"1": "pypdf", "2": "mistral", "pypdf": "pypdf", "mistral": "mistral"}
+
+    while True:
+        user_input = input(prompt).strip().lower()
+        selected = options.get(user_input)
+        if selected:
+            print(f"Motor seleccionado: {selected}")
+            return selected
+        print("Opción inválida. Escribe 1, 2, pypdf o mistral.")
 
 
 def build_paths(workspace: Path, lote: str, capa2_output_dir: Path | None, cap7_file: Path | None) -> PipelinePaths:
@@ -128,6 +153,8 @@ def main() -> int:
         str(paths.input_lote_dir),
         "--output-dir",
         str(paths.capa2_out_dir),
+        "--ocr-engine",
+        select_ocr_engine(args.ocr_engine),
     ]
 
     capa3_cmd = [

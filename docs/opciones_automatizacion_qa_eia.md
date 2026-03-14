@@ -253,6 +253,7 @@ python src/orquestador_pipeline.py --source /ruta/a/insumos --workspace . --lote
 
 **Parámetros útiles**
 - `--capa2-output-dir`: personaliza salida de la capa 2.
+- `--ocr-engine {pypdf,mistral}`: define motor para capa 2; si no se indica, el orquestador lo solicita en consola.
 - `--cap7-file`: usa un archivo de capítulo 7 específico para capa 4.
 - `--umbral-similitud`: ajusta umbral de matching en capa 5.
 - `--include-cap7-index`: incluye cap7 en índice maestro (capa 3).

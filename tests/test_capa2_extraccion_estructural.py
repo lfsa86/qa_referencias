@@ -90,6 +90,12 @@ class TestCapa2Extraccion(unittest.TestCase):
             [("figura", "grafico 2-1"), ("figura", "gráfico 3.4")],
         )
 
+    def test_detect_referenciables_mapa_en_toc(self):
+        page = "Mapa 4.2 ....... 33"
+        refs = detect_referenciables(page, 4, "cap4.pdf")
+        self.assertEqual(len(refs), 1)
+        self.assertEqual(refs[0].tipo, "mapa")
+        self.assertEqual(refs[0].id_detectado.lower(), "mapa 4.2")
 
 if __name__ == "__main__":
     unittest.main()

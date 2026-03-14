@@ -203,7 +203,7 @@ def format_heading_line(line: str) -> str:
 
 
 def remove_toc_noise(lines: list[str]) -> list[str]:
-    """Descarta líneas de TOC para no convertirlas en headings del cuerpo."""
+    """Descarta ruido de TOC pero conserva entradas de elementos referenciables."""
     if not lines:
         return lines
 
@@ -212,7 +212,12 @@ def remove_toc_noise(lines: list[str]) -> list[str]:
 
     cleaned: list[str] = []
     for line in lines:
-        if TOC_ENTRY_PREFIX_REGEX.match(line) and TOC_PAGE_HINT_REGEX.search(line):
+        toc_entry = TOC_ENTRY_PREFIX_REGEX.match(line)
+        if toc_entry and TOC_PAGE_HINT_REGEX.search(line):
+            entry = toc_entry.group("entry").strip().lower()
+            if entry.startswith(("tabla", "figura", "gráfico", "grafico", "mapa")):
+                cleaned.append(line)
+                continue
             continue
         if TOC_GLUE_LINE_REGEX.match(line):
             continue

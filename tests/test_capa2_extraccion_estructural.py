@@ -61,6 +61,33 @@ class TestCapa2Extraccion(unittest.TestCase):
         self.assertEqual(cleaned, ["Tabla de contenidos", "Texto cuerpo real"])
         self.assertTrue(is_likely_toc_page(lines))
 
+    def test_remove_toc_noise_conserva_tablas_en_tabla_contenido(self):
+        lines = [
+            "Tabla de contenidos",
+            "5.2.4.1.7.2Hidrología: Impacto RH-2 Cambio del régimen hidrológico y caudal5.2.4.1.7-106",
+            "Tabla 5.2.4.1.7.2-1: Actividades que generan impacto RH-2 5.2.4.1.7-107",
+            "Tabla 5.2.4.1.7.2-2: Actividades que generan impacto RH-2 5.2.4.1.7-109",
+        ]
+        cleaned = remove_toc_noise(lines)
+        self.assertEqual(
+            cleaned,
+            [
+                "Tabla de contenidos",
+                "Tabla 5.2.4.1.7.2-1: Actividades que generan impacto RH-2 5.2.4.1.7-107",
+                "Tabla 5.2.4.1.7.2-2: Actividades que generan impacto RH-2 5.2.4.1.7-109",
+            ],
+        )
+
+    def test_pages_to_markdown_conserva_tablas_del_toc(self):
+        pages = [
+            "Tabla de contenidos\n"
+            "5.2.4.1.7.2Hidrología: Impacto RH-2 Cambio del régimen hidrológico y caudal5.2.4.1.7-106\n"
+            "Tabla 5.2.4.1.7.2-1: Actividades que generan impacto RH-2 5.2.4.1.7-107"
+        ]
+        md = pages_to_markdown(pages, "cap5.pdf")
+        self.assertIn("Tabla 5.2.4.1.7.2-1: Actividades que generan impacto RH-2 5.2.4.1.7-107", md)
+        self.assertNotIn("5.2.4.1.7.2Hidrología", md)
+
     def test_detect_referenciables_solo_tabla_contenido(self):
         page = "Texto narrativo con Tabla 2-14 y Figura 3.2, sin puntos guía ni paginación"
         refs = detect_referenciables(page, 1, "cap7.pdf")

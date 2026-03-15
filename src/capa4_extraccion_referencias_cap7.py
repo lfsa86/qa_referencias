@@ -17,15 +17,31 @@ from pathlib import Path
 
 CSV_ENCODING = "utf-8-sig"
 
-TABLA_REGEX = re.compile(r"\b(Tabla\s+([1-6])[.-](\d+))\b", re.IGNORECASE)
-FIGURA_REGEX = re.compile(r"\b(Figura\s+([1-6])[.-](\d+))\b", re.IGNORECASE)
-GRAFICO_REGEX = re.compile(r"\b(Gr[aá]fico\s+([1-6])[.-](\d+))\b", re.IGNORECASE)
+TABLA_REGEX = re.compile(r"\b(Tabla\s+([1-6])((?:[.-]\d+){1,6}))\b", re.IGNORECASE)
+FIGURA_REGEX = re.compile(r"\b(Figura\s+([1-6])((?:[.-]\d+){1,6}))\b", re.IGNORECASE)
+GRAFICO_REGEX = re.compile(r"\b(Gr[aá]fico\s+([1-6])((?:[.-]\d+){1,6}))\b", re.IGNORECASE)
 FIGURA_PIC_REGEX = re.compile(r"\b(Figura\s+PIC\s+([1-6](?:[.-]\d+)+))\b", re.IGNORECASE)
 TABLA_LO_REGEX = re.compile(r"\b(Tabla\s+LO\s+([1-6](?:[.-]\d+)+))\b", re.IGNORECASE)
 ANEXO_PIC_REGEX = re.compile(r"\b(Anexo\s+PIC\s+([1-6](?:[.-]\d+)+))\b", re.IGNORECASE)
 NUMERAL_FULL_REGEX = re.compile(r"\b(Numeral\s+([1-6])((?:\.\d{1,3}){2,5}))\b", re.IGNORECASE)
-NUMERAL_SHORT_REGEX = re.compile(r"\b([1-6](?:\.\d{1,3}){2,5})\b")
+NUMERAL_SHORT_REGEX = re.compile(r"(?<![\d.])([1-6](?:\.\d{1,3}){2,5})(?![\d.])")
 CONTEXT_PAGE_REGEX = re.compile(r"(?:\d+(?:\.\d+)*)-(\d+)\s*\"?\s*$")
+HEADING_STRUCTURAL_REGEX = re.compile(r"^\s*7(?:\.\d+){2,}\s*(?:[A-ZÁÉÍÓÚÑ].*)?$")
+GLUED_HEADING_STRUCTURAL_REGEX = re.compile(r"^\s*7(?:\.\d+){2,}[A-ZÁÉÍÓÚÑ].*$")
+REFERENCE_CUES = (
+    "ver",
+    "véase",
+    "según",
+    "conforme",
+    "de acuerdo",
+    "descrito en",
+    "detallado en",
+    "referencia",
+    "numeral",
+    "tabla",
+    "figura",
+    "gráfico",
+)
 
 
 @dataclass
@@ -38,6 +54,8 @@ class RefCap7:
     capitulo_objetivo: str
     id_normalizado: str
     contexto: str
+    confianza: str
+    motivo_confianza: str
 
 
 def parse_args() -> argparse.Namespace:
@@ -133,9 +151,12 @@ def split_markdown_pages(md_text: str) -> list[str]:
     return pages
 
 
-def normalize_table_figure(tipo: str, chapter_num: str, item_num: str) -> str:
+def normalize_table_figure(tipo: str, chapter_num: str, suffix: str) -> str:
     prefix = "Tabla" if tipo == "tabla" else "Figura"
-    return f"{prefix} {chapter_num}-{item_num}"
+    clean_suffix = suffix.replace(".", "-").replace("_", "-")
+    if not clean_suffix.startswith("-"):
+        clean_suffix = f"-{clean_suffix}"
+    return f"{prefix} {chapter_num}{clean_suffix}"
 
 
 def normalize_numeral(chapter_num: str, suffix: str) -> str:
@@ -162,11 +183,51 @@ def infer_page_from_context(context: str, default_page: int) -> int:
         return default_page
 
 
+def paragraph_has_reference_cue(paragraph: str) -> bool:
+    lower = paragraph.lower()
+    return any(cue in lower for cue in REFERENCE_CUES)
+
+
+def is_structural_paragraph(paragraph: str) -> bool:
+    trimmed = paragraph.strip()
+    if not trimmed:
+        return False
+    if GLUED_HEADING_STRUCTURAL_REGEX.match(trimmed):
+        return True
+    return bool(HEADING_STRUCTURAL_REGEX.match(trimmed)) and len(trimmed.split()) <= 14
+
+
+def classify_confidence(tipo: str, paragraph: str, id_normalizado: str) -> tuple[str, str]:
+    if is_structural_paragraph(paragraph) and not paragraph_has_reference_cue(paragraph):
+        return "baja", "estructura_interna_cap7"
+
+    if tipo == "numeral" and not paragraph_has_reference_cue(paragraph):
+        return "media", "numeral_sin_verbos_de_referencia"
+
+    if tipo in {"tabla", "figura"} and id_normalizado.count("-") < 2:
+        return "media", "id_corto_potencialmente_ambiguo"
+
+    return "alta", "patron_explicito"
+
+
+def excel_safe_text(value: str) -> str:
+    if not value:
+        return value
+    return f'="{value}"'
+
+
 def detect_refs_in_paragraph(paragraph: str, page_num: int, parrafo_idx: int, source_name: str) -> list[RefCap7]:
     refs: list[RefCap7] = []
+    paragraph_has_cue = paragraph_has_reference_cue(paragraph)
+    paragraph_is_structural = is_structural_paragraph(paragraph)
+
+    if paragraph_is_structural and not paragraph_has_cue:
+        return refs
 
     for m in TABLA_REGEX.finditer(paragraph):
         chapter_num = m.group(2)
+        id_normalizado = normalize_table_figure("tabla", chapter_num, m.group(3))
+        confianza, motivo = classify_confidence("tabla", paragraph, id_normalizado)
         context = context_window(paragraph, m.start(), m.end())
         refs.append(
             RefCap7(
@@ -176,13 +237,17 @@ def detect_refs_in_paragraph(paragraph: str, page_num: int, parrafo_idx: int, so
                 tipo="tabla",
                 referencia_original=m.group(1),
                 capitulo_objetivo=f"cap{chapter_num}",
-                id_normalizado=normalize_table_figure("tabla", chapter_num, m.group(3)),
+                id_normalizado=id_normalizado,
                 contexto=context,
+                confianza=confianza,
+                motivo_confianza=motivo,
             )
         )
 
     for m in FIGURA_REGEX.finditer(paragraph):
         chapter_num = m.group(2)
+        id_normalizado = normalize_table_figure("figura", chapter_num, m.group(3))
+        confianza, motivo = classify_confidence("figura", paragraph, id_normalizado)
         context = context_window(paragraph, m.start(), m.end())
         refs.append(
             RefCap7(
@@ -192,13 +257,17 @@ def detect_refs_in_paragraph(paragraph: str, page_num: int, parrafo_idx: int, so
                 tipo="figura",
                 referencia_original=m.group(1),
                 capitulo_objetivo=f"cap{chapter_num}",
-                id_normalizado=normalize_table_figure("figura", chapter_num, m.group(3)),
+                id_normalizado=id_normalizado,
                 contexto=context,
+                confianza=confianza,
+                motivo_confianza=motivo,
             )
         )
 
     for m in GRAFICO_REGEX.finditer(paragraph):
         chapter_num = m.group(2)
+        id_normalizado = normalize_table_figure("figura", chapter_num, m.group(3))
+        confianza, motivo = classify_confidence("figura", paragraph, id_normalizado)
         context = context_window(paragraph, m.start(), m.end())
         refs.append(
             RefCap7(
@@ -208,13 +277,17 @@ def detect_refs_in_paragraph(paragraph: str, page_num: int, parrafo_idx: int, so
                 tipo="figura",
                 referencia_original=m.group(1),
                 capitulo_objetivo=f"cap{chapter_num}",
-                id_normalizado=normalize_table_figure("figura", chapter_num, m.group(3)),
+                id_normalizado=id_normalizado,
                 contexto=context,
+                confianza=confianza,
+                motivo_confianza=motivo,
             )
         )
 
     for m in FIGURA_PIC_REGEX.finditer(paragraph):
         chapter_num = m.group(2).split(".")[0].split("-")[0]
+        id_normalizado = normalize_special_reference("Figura PIC", m.group(2))
+        confianza, motivo = classify_confidence("figura", paragraph, id_normalizado)
         context = context_window(paragraph, m.start(), m.end())
         refs.append(
             RefCap7(
@@ -224,13 +297,17 @@ def detect_refs_in_paragraph(paragraph: str, page_num: int, parrafo_idx: int, so
                 tipo="figura",
                 referencia_original=m.group(1),
                 capitulo_objetivo=f"cap{chapter_num}",
-                id_normalizado=normalize_special_reference("Figura PIC", m.group(2)),
+                id_normalizado=id_normalizado,
                 contexto=context,
+                confianza=confianza,
+                motivo_confianza=motivo,
             )
         )
 
     for m in TABLA_LO_REGEX.finditer(paragraph):
         chapter_num = m.group(2).split(".")[0].split("-")[0]
+        id_normalizado = normalize_special_reference("Tabla LO", m.group(2))
+        confianza, motivo = classify_confidence("tabla", paragraph, id_normalizado)
         context = context_window(paragraph, m.start(), m.end())
         refs.append(
             RefCap7(
@@ -240,13 +317,17 @@ def detect_refs_in_paragraph(paragraph: str, page_num: int, parrafo_idx: int, so
                 tipo="tabla",
                 referencia_original=m.group(1),
                 capitulo_objetivo=f"cap{chapter_num}",
-                id_normalizado=normalize_special_reference("Tabla LO", m.group(2)),
+                id_normalizado=id_normalizado,
                 contexto=context,
+                confianza=confianza,
+                motivo_confianza=motivo,
             )
         )
 
     for m in ANEXO_PIC_REGEX.finditer(paragraph):
         chapter_num = m.group(2).split(".")[0].split("-")[0]
+        id_normalizado = normalize_special_reference("Anexo PIC", m.group(2))
+        confianza, motivo = classify_confidence("anexo", paragraph, id_normalizado)
         context = context_window(paragraph, m.start(), m.end())
         refs.append(
             RefCap7(
@@ -256,13 +337,19 @@ def detect_refs_in_paragraph(paragraph: str, page_num: int, parrafo_idx: int, so
                 tipo="anexo",
                 referencia_original=m.group(1),
                 capitulo_objetivo=f"cap{chapter_num}",
-                id_normalizado=normalize_special_reference("Anexo PIC", m.group(2)),
+                id_normalizado=id_normalizado,
                 contexto=context,
+                confianza=confianza,
+                motivo_confianza=motivo,
             )
         )
 
     for m in NUMERAL_FULL_REGEX.finditer(paragraph):
         chapter_num = m.group(2)
+        id_normalizado = normalize_numeral(chapter_num, m.group(3))
+        confianza, motivo = classify_confidence("numeral", paragraph, id_normalizado)
+        if confianza == "baja":
+            continue
         context = context_window(paragraph, m.start(), m.end())
         refs.append(
             RefCap7(
@@ -272,18 +359,32 @@ def detect_refs_in_paragraph(paragraph: str, page_num: int, parrafo_idx: int, so
                 tipo="numeral",
                 referencia_original=m.group(1),
                 capitulo_objetivo=f"cap{chapter_num}",
-                id_normalizado=normalize_numeral(chapter_num, m.group(3)),
+                id_normalizado=id_normalizado,
                 contexto=context,
+                confianza=confianza,
+                motivo_confianza=motivo,
             )
         )
 
     # Numerales sin palabra 'Numeral', evitando duplicar matches ya capturados.
     for m in NUMERAL_SHORT_REGEX.finditer(paragraph):
-        if "numeral" in paragraph[max(0, m.start() - 10) : m.start()].lower():
+        prior_window = paragraph[max(0, m.start() - 14) : m.start()].lower()
+        if "numeral" in prior_window:
             continue
+        if any(token in prior_window for token in ("tabla", "figura", "gráfico", "grafico", "anexo")):
+            continue
+
         raw = m.group(1)
+        if raw.startswith("7."):
+            continue
+
         chapter_num = raw.split(".")[0]
         suffix = raw[len(chapter_num) :]
+        id_normalizado = normalize_numeral(chapter_num, suffix)
+        confianza, motivo = classify_confidence("numeral", paragraph, id_normalizado)
+        if confianza == "baja":
+            continue
+
         context = context_window(paragraph, m.start(), m.end())
         refs.append(
             RefCap7(
@@ -293,8 +394,10 @@ def detect_refs_in_paragraph(paragraph: str, page_num: int, parrafo_idx: int, so
                 tipo="numeral",
                 referencia_original=raw,
                 capitulo_objetivo=f"cap{chapter_num}",
-                id_normalizado=normalize_numeral(chapter_num, suffix),
+                id_normalizado=id_normalizado,
                 contexto=context,
+                confianza=confianza,
+                motivo_confianza=motivo,
             )
         )
 
@@ -338,7 +441,11 @@ def write_csv(path: Path, refs: list[RefCap7]) -> None:
                 "referencia_original",
                 "capitulo_objetivo",
                 "id_normalizado",
+                "id_normalizado_excel_safe",
+                "referencia_original_excel_safe",
                 "contexto",
+                "confianza",
+                "motivo_confianza",
             ]
         )
         for r in refs:
@@ -351,7 +458,11 @@ def write_csv(path: Path, refs: list[RefCap7]) -> None:
                     r.referencia_original,
                     r.capitulo_objetivo,
                     r.id_normalizado,
+                    excel_safe_text(r.id_normalizado),
+                    excel_safe_text(r.referencia_original),
                     r.contexto,
+                    r.confianza,
+                    r.motivo_confianza,
                 ]
             )
 
